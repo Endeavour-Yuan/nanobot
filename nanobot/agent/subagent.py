@@ -6,12 +6,12 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
 from nanobot.agent.hook import AgentHook, AgentHookContext
-from nanobot.agent.runner import AgentRunner, AgentRunSpec
+from nanobot.agent.runner import AgentRunResult, AgentRunner, AgentRunSpec
 from nanobot.agent.tools.context import ToolContext
 from nanobot.agent.tools.file_state import FileStates
 from nanobot.agent.tools.loader import ToolLoader
@@ -21,6 +21,9 @@ from nanobot.bus.queue import MessageBus
 from nanobot.config.schema import AgentDefaults, ToolsConfig
 from nanobot.providers.base import LLMProvider
 from nanobot.utils.prompt_templates import render_template
+
+if TYPE_CHECKING:
+    from nanobot.agent.tools.base import Tool
 
 
 @dataclass(slots=True)
@@ -123,6 +126,38 @@ class SubagentManager:
         self.provider = provider
         self.model = model
         self.runner.provider = provider
+
+    async def run_step(
+        self,
+        system_prompt: str,
+        user_message: str,
+        extra_tools: list["Tool"] | None = None,
+    ) -> AgentRunResult:
+        """Run a single subagent step and return the result directly.
+
+        Unlike ``spawn``, this awaits completion and returns the
+        ``AgentRunResult`` — no message-bus announcement.
+        """
+        tools = self._build_tools()
+        for t in (extra_tools or []):
+            tools.register(t)
+        # Deliberately lower than _run_subagent()'s 15: long-task steps must
+        # be short to encourage handoff() calls instead of doing everything.
+        return await self.runner.run(AgentRunSpec(
+            initial_messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+            tools=tools,
+            model=self.model,
+            max_iterations=8,
+            max_iterations_message=(
+                "Tool budget exhausted. "
+                "Call handoff() or complete() earlier next time."
+            ),
+            max_tool_result_chars=self.max_tool_result_chars,
+            fail_on_tool_error=False,
+        ))
 
     async def spawn(
         self,
