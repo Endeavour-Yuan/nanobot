@@ -20,10 +20,12 @@ def test_sanitize_persisted_blocks_truncate_text_shadowing_regression() -> None:
     assert "should_truncate_text" in sig.parameters
     assert "truncate_text" not in sig.parameters
 
-    dummy = SimpleNamespace(max_tool_result_chars=5)
+    from nanobot.agent.turn_writer import TurnWriter
+
+    writer = TurnWriter(sessions=None, checkpoint=None, max_tool_result_chars=5)  # type: ignore[arg-type]
     content = [{"type": "text", "text": "0123456789"}]
 
-    out = AgentLoop._sanitize_persisted_blocks(dummy, content, should_truncate_text=True)
+    out = writer.sanitize_persisted_blocks(content, should_truncate_text=True)
     assert isinstance(out, list)
     assert out and out[0]["type"] == "text"
     assert isinstance(out[0]["text"], str)

@@ -19,9 +19,17 @@ from nanobot.utils.webui_titles import (
 
 def _mk_loop() -> AgentLoop:
     loop = AgentLoop.__new__(AgentLoop)
+    from nanobot.agent.checkpoint import CheckpointManager
+    from nanobot.agent.turn_writer import TurnWriter
     from nanobot.config.schema import AgentDefaults
 
     loop.max_tool_result_chars = AgentDefaults().max_tool_result_chars
+    loop._checkpoint_mgr = CheckpointManager(sessions=None)  # type: ignore[arg-type]
+    loop._turn_writer = TurnWriter(
+        sessions=None,  # type: ignore[arg-type]
+        checkpoint=loop._checkpoint_mgr,
+        max_tool_result_chars=loop.max_tool_result_chars,
+    )
     return loop
 
 
