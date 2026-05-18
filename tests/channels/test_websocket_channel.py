@@ -29,7 +29,7 @@ from nanobot.channels.websocket import (
     publish_runtime_model_update,
 )
 from nanobot.config.loader import load_config, save_config
-from nanobot.config.schema import Config
+from nanobot.config.schema import Config, ModelPresetConfig
 
 # -- Shared helpers (aligned with test_websocket_integration.py) ---------------
 
@@ -991,6 +991,11 @@ async def test_settings_api_returns_safe_subset_and_updates_whitelist(
     config = Config()
     config.agents.defaults.model = "openai/gpt-4o"
     config.providers.openai.api_key = "secret-key"
+    config.model_presets["deep"] = ModelPresetConfig(
+        model="anthropic/claude-opus-4-5",
+        provider="anthropic",
+        reasoning_effort="high",
+    )
     config.tools.web.search.provider = "brave"
     config.tools.web.search.api_key = "brave-secret"
     save_config(config, config_path)
@@ -1011,6 +1016,13 @@ async def test_settings_api_returns_safe_subset_and_updates_whitelist(
         body = settings.json()
         assert body["agent"]["model"] == "openai/gpt-4o"
         assert body["agent"]["provider"] == "openai"
+        assert body["agent"]["model_preset"] == "default"
+        assert body["agent"]["max_tokens"] == 8192
+        assert body["agent"]["timezone"] == "UTC"
+        assert body["agent"]["tool_hint_max_length"] == 40
+        presets = {preset["name"]: preset for preset in body["model_presets"]}
+        assert presets["default"]["active"] is True
+        assert presets["deep"]["reasoning_effort"] == "high"
         providers = {provider["name"]: provider for provider in body["providers"]}
         assert providers["openai"]["configured"] is True
         assert providers["openai"]["api_key_hint"] == "secr••••-key"
@@ -1025,9 +1037,16 @@ async def test_settings_api_returns_safe_subset_and_updates_whitelist(
         assert body["agent"]["has_api_key"] is True
         assert body["web_search"]["provider"] == "brave"
         assert body["web_search"]["api_key_hint"] == "brav••••cret"
+        assert body["web_search"]["max_results"] == 5
+        assert body["web"]["fetch"]["use_jina_reader"] is True
         search_providers = {provider["name"]: provider for provider in body["web_search"]["providers"]}
         assert search_providers["duckduckgo"]["credential"] == "none"
         assert search_providers["searxng"]["credential"] == "base_url"
+        assert body["runtime"]["config_path"] == str(config_path)
+        assert body["runtime"]["workspace_path"].endswith(".nanobot/workspace")
+        assert body["runtime"]["gateway_port"] == 18790
+        assert body["advanced"]["exec_enabled"] is True
+        assert body["advanced"]["mcp_server_count"] == 0
         assert "secret-key" not in settings.text
         assert "brave-secret" not in settings.text
 
@@ -1061,16 +1080,33 @@ async def test_settings_api_returns_safe_subset_and_updates_whitelist(
         updated = await _http_get(
             "http://127.0.0.1:"
             f"{port}/api/settings/update?model=atomic_chat/test"
-            "&provider=atomic_chat",
+            "&provider=atomic_chat&timezone=Asia%2FShanghai"
+            "&bot_name=Nano&bot_icon=N&tool_hint_max_length=120",
             headers={"Authorization": "Bearer tok"},
         )
         assert updated.status_code == 200
         assert updated.json()["requires_restart"] is False
 
+        preset_updated = await _http_get(
+            "http://127.0.0.1:"
+            f"{port}/api/settings/update?model_preset=deep",
+            headers={"Authorization": "Bearer tok"},
+        )
+        assert preset_updated.status_code == 200
+        assert preset_updated.json()["agent"]["model"] == "anthropic/claude-opus-4-5"
+
+        bad_preset = await _http_get(
+            "http://127.0.0.1:"
+            f"{port}/api/settings/update?model_preset=missing",
+            headers={"Authorization": "Bearer tok"},
+        )
+        assert bad_preset.status_code == 400
+
         search_updated = await _http_get(
             "http://127.0.0.1:"
             f"{port}/api/settings/web-search/update?provider=searxng"
-            "&base_url=https%3A%2F%2Fsearch.example.com",
+            "&base_url=https%3A%2F%2Fsearch.example.com"
+            "&max_results=8&timeout=45&use_jina_reader=false",
             headers={"Authorization": "Bearer tok"},
         )
         assert search_updated.status_code == 200
@@ -1079,16 +1115,33 @@ async def test_settings_api_returns_safe_subset_and_updates_whitelist(
         assert search_body["web_search"]["provider"] == "searxng"
         assert search_body["web_search"]["api_key_hint"] is None
         assert search_body["web_search"]["base_url"] == "https://search.example.com"
+        assert search_body["web_search"]["max_results"] == 8
+        assert search_body["web"]["fetch"]["use_jina_reader"] is False
+
+        bad_web = await _http_get(
+            "http://127.0.0.1:"
+            f"{port}/api/settings/web-search/update?provider=duckduckgo&max_results=99",
+            headers={"Authorization": "Bearer tok"},
+        )
+        assert bad_web.status_code == 400
 
         saved = load_config(config_path)
         assert saved.agents.defaults.model == "atomic_chat/test"
         assert saved.agents.defaults.provider == "atomic_chat"
+        assert saved.agents.defaults.model_preset == "deep"
+        assert saved.agents.defaults.timezone == "Asia/Shanghai"
+        assert saved.agents.defaults.bot_name == "Nano"
+        assert saved.agents.defaults.bot_icon == "N"
+        assert saved.agents.defaults.tool_hint_max_length == 120
         assert saved.providers.openrouter.api_key == "sk-or-test"
         assert saved.providers.openrouter.api_base == "https://openrouter.ai/api/v1"
         assert saved.providers.atomic_chat.api_base == "http://localhost:1337/v1"
         assert saved.tools.web.search.provider == "searxng"
         assert saved.tools.web.search.api_key == ""
         assert saved.tools.web.search.base_url == "https://search.example.com"
+        assert saved.tools.web.search.max_results == 8
+        assert saved.tools.web.search.timeout == 45
+        assert saved.tools.web.fetch.use_jina_reader is False
     finally:
         await channel.stop()
         await server_task

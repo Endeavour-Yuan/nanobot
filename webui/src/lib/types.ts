@@ -125,7 +125,28 @@ export interface SettingsPayload {
     provider: string;
     resolved_provider: string | null;
     has_api_key: boolean;
+    model_preset: string | null;
+    max_tokens: number;
+    context_window_tokens: number;
+    temperature: number;
+    reasoning_effort: string | null;
+    timezone: string;
+    bot_name: string;
+    bot_icon: string;
+    tool_hint_max_length: number;
   };
+  model_presets: Array<{
+    name: string;
+    label: string;
+    active: boolean;
+    is_default: boolean;
+    model: string;
+    provider: string;
+    max_tokens: number;
+    context_window_tokens: number;
+    temperature: number;
+    reasoning_effort: string | null;
+  }>;
   providers: Array<{
     name: string;
     label: string;
@@ -139,14 +160,51 @@ export interface SettingsPayload {
     provider: string;
     api_key_hint?: string | null;
     base_url?: string | null;
+    max_results: number;
+    timeout: number;
     providers: Array<{
       name: string;
       label: string;
       credential: "none" | "api_key" | "base_url";
     }>;
   };
+  web: {
+    enable: boolean;
+    proxy?: string | null;
+    user_agent?: string | null;
+    search: {
+      max_results: number;
+      timeout: number;
+    };
+    fetch: {
+      use_jina_reader: boolean;
+    };
+  };
   runtime: {
     config_path: string;
+    workspace_path: string;
+    gateway_host: string;
+    gateway_port: number;
+    heartbeat: {
+      enabled: boolean;
+      interval_s: number;
+      keep_recent_messages: number;
+    };
+    dream: {
+      schedule: string;
+      max_batch_size: number;
+      max_iterations: number;
+      annotate_line_ages: boolean;
+    };
+    unified_session: boolean;
+  };
+  advanced: {
+    restrict_to_workspace: boolean;
+    ssrf_whitelist_count: number;
+    mcp_server_count: number;
+    exec_enabled: boolean;
+    exec_sandbox?: string | null;
+    exec_path_append_set: boolean;
   };
   requires_restart: boolean;
 }
@@ -154,6 +212,11 @@ export interface SettingsPayload {
 export interface SettingsUpdate {
   model?: string;
   provider?: string;
+  modelPreset?: string | null;
+  timezone?: string;
+  botName?: string;
+  botIcon?: string;
+  toolHintMaxLength?: number;
 }
 
 export interface ProviderSettingsUpdate {
@@ -166,6 +229,9 @@ export interface WebSearchSettingsUpdate {
   provider: string;
   apiKey?: string;
   baseUrl?: string;
+  maxResults?: number;
+  timeout?: number;
+  useJinaReader?: boolean;
 }
 
 export interface SlashCommand {

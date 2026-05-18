@@ -46,12 +46,17 @@ describe("webui API helpers", () => {
 
   it("serializes settings updates as a narrow query string", async () => {
     await updateSettings("tok", {
+      modelPreset: "default",
       model: "openrouter/test",
       provider: "openrouter",
+      timezone: "Asia/Shanghai",
+      botName: "nanobot",
+      botIcon: "nb",
+      toolHintMaxLength: 120,
     });
 
     expect(fetch).toHaveBeenCalledWith(
-      "/api/settings/update?model=openrouter%2Ftest&provider=openrouter",
+      "/api/settings/update?model_preset=default&model=openrouter%2Ftest&provider=openrouter&timezone=Asia%2FShanghai&bot_name=nanobot&bot_icon=nb&tool_hint_max_length=120",
       expect.objectContaining({
         headers: { Authorization: "Bearer tok" },
       }),
@@ -77,10 +82,13 @@ describe("webui API helpers", () => {
     await updateWebSearchSettings("tok", {
       provider: "searxng",
       baseUrl: "https://search.example.com",
+      maxResults: 8,
+      timeout: 45,
+      useJinaReader: false,
     });
 
     expect(fetch).toHaveBeenCalledWith(
-      "/api/settings/web-search/update?provider=searxng&base_url=https%3A%2F%2Fsearch.example.com",
+      "/api/settings/web-search/update?provider=searxng&base_url=https%3A%2F%2Fsearch.example.com&max_results=8&timeout=45&use_jina_reader=false",
       expect.objectContaining({
         headers: { Authorization: "Bearer tok" },
       }),

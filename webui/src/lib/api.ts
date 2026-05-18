@@ -131,8 +131,17 @@ export async function updateSettings(
   base: string = "",
 ): Promise<SettingsPayload> {
   const query = new URLSearchParams();
+  if (update.modelPreset !== undefined) {
+    query.set("model_preset", update.modelPreset ?? "default");
+  }
   if (update.model !== undefined) query.set("model", update.model);
   if (update.provider !== undefined) query.set("provider", update.provider);
+  if (update.timezone !== undefined) query.set("timezone", update.timezone);
+  if (update.botName !== undefined) query.set("bot_name", update.botName);
+  if (update.botIcon !== undefined) query.set("bot_icon", update.botIcon);
+  if (update.toolHintMaxLength !== undefined) {
+    query.set("tool_hint_max_length", String(update.toolHintMaxLength));
+  }
   return request<SettingsPayload>(`${base}/api/settings/update?${query}`, token);
 }
 
@@ -160,6 +169,11 @@ export async function updateWebSearchSettings(
   query.set("provider", update.provider);
   if (update.apiKey !== undefined) query.set("api_key", update.apiKey);
   if (update.baseUrl !== undefined) query.set("base_url", update.baseUrl);
+  if (update.maxResults !== undefined) query.set("max_results", String(update.maxResults));
+  if (update.timeout !== undefined) query.set("timeout", String(update.timeout));
+  if (update.useJinaReader !== undefined) {
+    query.set("use_jina_reader", String(update.useJinaReader));
+  }
   return request<SettingsPayload>(
     `${base}/api/settings/web-search/update?${query}`,
     token,
