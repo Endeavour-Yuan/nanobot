@@ -32,7 +32,6 @@ from nanobot.command import CommandContext, CommandRouter, register_builtin_comm
 from nanobot.config.schema import AgentDefaults, ModelPresetConfig
 from nanobot.providers.base import LLMProvider
 from nanobot.providers.factory import ProviderSnapshot
-from nanobot.session.attachments import merge_turn_media_into_last_assistant
 from nanobot.session.goal_state import (
     runner_wall_llm_timeout_s,
 )
@@ -42,7 +41,6 @@ from nanobot.session.webui_turns import (
     build_bus_progress_callback,
     mark_webui_session,
 )
-from nanobot.utils.artifacts import generated_image_paths_from_messages
 from nanobot.utils.document import extract_documents
 from nanobot.utils.helpers import image_placeholder_text
 from nanobot.utils.helpers import truncate_text as truncate_text_fn
@@ -103,7 +101,6 @@ class TurnContext:
     save_skip: int = 0
 
     outbound: OutboundMessage | None = None
-    generated_media: list[str] = field(default_factory=list)
 
     on_progress: Callable[..., Awaitable[None]] | None = None
     on_stream: Callable[[str], Awaitable[None]] | None = None
@@ -1194,7 +1191,6 @@ class AgentLoop:
         all_msgs: list[dict[str, Any]],
         stop_reason: str,
         had_injections: bool,
-        generated_media: list[str],
         on_stream: Callable[[str], Awaitable[None]] | None,
         *,
         turn_latency_ms: int | None = None,
@@ -1218,7 +1214,6 @@ class AgentLoop:
             channel=msg.channel,
             chat_id=msg.chat_id,
             content=final_content,
-            media=generated_media,
             metadata=meta,
         )
 
@@ -1348,11 +1343,6 @@ class AgentLoop:
             ctx.final_content = EMPTY_FINAL_RESPONSE_MESSAGE
 
         ctx.save_skip = 1 + len(ctx.history) + (1 if ctx.user_persisted_early else 0)
-        skip_msgs = ctx.all_messages[ctx.save_skip:]
-        ctx.generated_media = generated_image_paths_from_messages(skip_msgs)
-        mt = self.tools.get("message")
-        extra = getattr(mt, "turn_delivered_media_paths", lambda: [])() if mt else []
-        merge_turn_media_into_last_assistant(ctx.all_messages, ctx.generated_media, extra)
 
         ctx.turn_latency_ms = max(0, int((time.time() - ctx.turn_wall_started_at) * 1000))
         self._save_turn(
@@ -1380,7 +1370,6 @@ class AgentLoop:
             ctx.all_messages,
             ctx.stop_reason,
             ctx.had_injections,
-            ctx.generated_media,
             ctx.on_stream,
             turn_latency_ms=ctx.turn_latency_ms,
         )
