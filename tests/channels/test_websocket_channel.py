@@ -30,6 +30,7 @@ from nanobot.channels.websocket import (
 )
 from nanobot.config.loader import load_config, save_config
 from nanobot.config.schema import Config, ModelPresetConfig
+from nanobot.webui.settings_api import settings_payload
 
 # -- Shared helpers (aligned with test_websocket_integration.py) ---------------
 
@@ -756,7 +757,7 @@ async def test_maybe_push_turn_run_wall_clock_skips_when_no_active_turn() -> Non
     channel = WebSocketChannel({"enabled": True, "allowFrom": ["*"]}, bus)
     mock_ws = AsyncMock()
     channel._attach(mock_ws, "chat-1")
-    from nanobot.utils import webui_turn_helpers as wth
+    from nanobot.webui import turn_helpers as wth
 
     wth._WEBSOCKET_TURN_WALL_STARTED_AT.clear()
     await channel._maybe_push_turn_run_wall_clock("chat-1")
@@ -769,7 +770,7 @@ async def test_maybe_push_turn_run_wall_clock_replays_running() -> None:
     channel = WebSocketChannel({"enabled": True, "allowFrom": ["*"]}, bus)
     mock_ws = AsyncMock()
     channel._attach(mock_ws, "chat-1")
-    from nanobot.utils import webui_turn_helpers as wth
+    from nanobot.webui import turn_helpers as wth
 
     wth._WEBSOCKET_TURN_WALL_STARTED_AT.clear()
     try:
@@ -1186,7 +1187,7 @@ def test_settings_payload_normalizes_camel_case_provider(
     save_config(config, config_path)
     monkeypatch.setattr("nanobot.config.loader._current_config_path", config_path)
 
-    body = _ch(bus)._settings_payload()
+    body = settings_payload()
 
     assert body["agent"]["provider"] == "minimax_anthropic"
 

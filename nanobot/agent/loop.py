@@ -43,8 +43,8 @@ from nanobot.utils.helpers import truncate_text as truncate_text_fn
 from nanobot.utils.image_generation_intent import image_generation_prompt
 from nanobot.utils.llm_runtime import LLMRuntime
 from nanobot.utils.runtime import EMPTY_FINAL_RESPONSE_MESSAGE
-from nanobot.utils.session_attachments import merge_turn_media_into_last_assistant
-from nanobot.utils.webui_turn_helpers import (
+from nanobot.webui.attachments import merge_turn_media_into_last_assistant
+from nanobot.webui.turn_helpers import (
     WebuiTurnCoordinator,
     build_bus_progress_callback,
     mark_webui_session,
