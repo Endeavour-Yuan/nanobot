@@ -32,10 +32,16 @@ from nanobot.command import CommandContext, CommandRouter, register_builtin_comm
 from nanobot.config.schema import AgentDefaults, ModelPresetConfig
 from nanobot.providers.base import LLMProvider
 from nanobot.providers.factory import ProviderSnapshot
+from nanobot.session.attachments import merge_turn_media_into_last_assistant
 from nanobot.session.goal_state import (
     runner_wall_llm_timeout_s,
 )
 from nanobot.session.manager import Session, SessionManager
+from nanobot.session.webui_turns import (
+    WebuiTurnCoordinator,
+    build_bus_progress_callback,
+    mark_webui_session,
+)
 from nanobot.utils.artifacts import generated_image_paths_from_messages
 from nanobot.utils.document import extract_documents
 from nanobot.utils.helpers import image_placeholder_text
@@ -43,12 +49,6 @@ from nanobot.utils.helpers import truncate_text as truncate_text_fn
 from nanobot.utils.image_generation_intent import image_generation_prompt
 from nanobot.utils.llm_runtime import LLMRuntime
 from nanobot.utils.runtime import EMPTY_FINAL_RESPONSE_MESSAGE
-from nanobot.webui.attachments import merge_turn_media_into_last_assistant
-from nanobot.webui.turn_helpers import (
-    WebuiTurnCoordinator,
-    build_bus_progress_callback,
-    mark_webui_session,
-)
 
 if TYPE_CHECKING:
     from nanobot.config.schema import (

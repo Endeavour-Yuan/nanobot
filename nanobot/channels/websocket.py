@@ -37,6 +37,7 @@ from nanobot.command.builtin import builtin_command_palette
 from nanobot.config.paths import get_media_dir
 from nanobot.config.schema import Base
 from nanobot.session.goal_state import goal_state_ws_blob
+from nanobot.session.webui_turns import websocket_turn_wall_started_at
 from nanobot.utils.helpers import safe_filename
 from nanobot.utils.media_decode import (
     FileSizeExceeded,
@@ -56,7 +57,6 @@ from nanobot.webui.sidebar_state import (
 )
 from nanobot.webui.thread_disk import delete_webui_thread
 from nanobot.webui.transcript import append_transcript_object, build_webui_thread_response
-from nanobot.webui.turn_helpers import websocket_turn_wall_started_at
 
 if TYPE_CHECKING:
     from nanobot.session.manager import SessionManager

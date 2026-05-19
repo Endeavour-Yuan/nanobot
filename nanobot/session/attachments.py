@@ -1,8 +1,9 @@
-"""Session replay: ensure assistant ``media`` paths are under the media root.
+"""Session replay media helpers.
 
-WebUI history signing (``/api/.../messages``) only works for files inside
-``get_media_dir``. Tool-driven attachments may live in the workspace; stage
-copies into the websocket media bucket before persisting message JSON.
+Persisted assistant ``media`` paths need to live under ``get_media_dir`` so
+session replay and signed media URLs can serve them later. Tool-driven
+attachments may live in the workspace; stage copies into the WebSocket media
+bucket before persisting message JSON.
 """
 
 from __future__ import annotations
