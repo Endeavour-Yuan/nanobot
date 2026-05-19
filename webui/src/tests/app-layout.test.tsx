@@ -178,6 +178,235 @@ describe("App layout", () => {
     expect(document.body.style.pointerEvents).not.toBe("none");
   }, 15_000);
 
+  it("keeps the mobile session action menu inside the sidebar sheet", async () => {
+    mockSessions = [
+      {
+        key: "websocket:chat-a",
+        channel: "websocket",
+        chatId: "chat-a",
+        createdAt: "2026-04-16T10:00:00Z",
+        updatedAt: "2026-04-16T10:00:00Z",
+        preview: "Existing chat",
+      },
+    ];
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn().mockImplementation((query: string) => ({
+        matches: !query.includes("1024px"),
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    );
+
+    render(<App />);
+
+    await waitFor(() => expect(connectSpy).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "Toggle sidebar" }));
+
+    const sheet = await screen.findByRole("dialog");
+    const mobileSidebar = within(sheet).getByRole("navigation", {
+      name: "Sidebar navigation",
+    });
+    await waitFor(() =>
+      expect(
+        within(mobileSidebar).getByRole("button", { name: /^Existing chat$/ }),
+      ).toBeInTheDocument(),
+    );
+
+    fireEvent.pointerDown(
+      within(mobileSidebar).getByLabelText("Chat actions for Existing chat"),
+      { button: 0 },
+    );
+
+    const deleteItem = await within(sheet).findByRole("menuitem", {
+      name: "Delete",
+    });
+    expect(deleteItem).toBeInTheDocument();
+
+    fireEvent.click(deleteItem);
+    await waitFor(() =>
+      expect(screen.getByText("Delete this chat?")).toBeInTheDocument(),
+    );
+  }, 15_000);
+
+  it("applies persisted sidebar workspace state from the gateway", async () => {
+    mockSessions = [
+      {
+        key: "websocket:chat-a",
+        channel: "websocket",
+        chatId: "chat-a",
+        createdAt: "2026-04-16T10:00:00Z",
+        updatedAt: "2026-04-16T10:00:00Z",
+        preview: "First chat",
+      },
+      {
+        key: "websocket:chat-b",
+        channel: "websocket",
+        chatId: "chat-b",
+        createdAt: "2026-04-16T11:00:00Z",
+        updatedAt: "2026-04-16T11:00:00Z",
+        preview: "Second chat",
+      },
+    ];
+    const initialState = {
+      schema_version: 1,
+      pinned_keys: ["websocket:chat-b"],
+      archived_keys: ["websocket:chat-a"],
+      title_overrides: { "websocket:chat-b": "Roadmap" },
+      tags_by_key: {},
+      collapsed_groups: {},
+      view: {
+        density: "comfortable",
+        show_previews: false,
+        show_timestamps: false,
+        show_archived: false,
+        sort: "updated_desc",
+      },
+      updated_at: null,
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async (url: string | URL | Request) => {
+        const href = String(url);
+        if (href === "/api/webui/sidebar-state") {
+          return { ok: true, json: async () => initialState };
+        }
+        if (href.startsWith("/api/webui/sidebar-state/update?")) {
+          const encoded = new URLSearchParams(href.split("?", 2)[1]).get("state");
+          return {
+            ok: true,
+            json: async () => JSON.parse(encoded ?? "{}"),
+          };
+        }
+        return { ok: false, status: 404 };
+      }),
+    );
+
+    render(<App />);
+
+    await waitFor(() => expect(connectSpy).toHaveBeenCalled());
+    const sidebar = screen.getByRole("navigation", { name: "Sidebar navigation" });
+    await waitFor(() =>
+      expect(within(sidebar).getByText("Pinned")).toBeInTheDocument(),
+    );
+    expect(within(sidebar).getByRole("button", { name: /^Roadmap$/ })).toBeInTheDocument();
+    expect(within(sidebar).queryByRole("button", { name: /^First chat$/ })).not.toBeInTheDocument();
+
+    fireEvent.click(within(sidebar).getByRole("button", { name: "Show archived" }));
+    await waitFor(() =>
+      expect(within(sidebar).getByText("Archived")).toBeInTheDocument(),
+    );
+    expect(within(sidebar).getByRole("button", { name: /^First chat$/ })).toBeInTheDocument();
+    const updateUrl = vi.mocked(fetch).mock.calls
+      .map(([url]) => String(url))
+      .find((url) => url.startsWith("/api/webui/sidebar-state/update?"));
+    expect(updateUrl).toBeTruthy();
+    const encoded = new URLSearchParams(updateUrl?.split("?", 2)[1]).get("state");
+    expect(JSON.parse(encoded ?? "{}").view.show_archived).toBe(true);
+
+    fireEvent.pointerDown(within(sidebar).getByRole("button", { name: "View" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.click(await screen.findByText("Compact list"));
+    await waitFor(() => {
+      const lastUpdateUrl = vi.mocked(fetch).mock.calls
+        .map(([url]) => String(url))
+        .filter((url) => url.startsWith("/api/webui/sidebar-state/update?"))
+        .at(-1);
+      const lastEncoded = new URLSearchParams(lastUpdateUrl?.split("?", 2)[1]).get("state");
+      expect(JSON.parse(lastEncoded ?? "{}").view.density).toBe("compact");
+    });
+
+    fireEvent.click(screen.getByText("Title A-Z"));
+    await waitFor(() => {
+      const lastUpdateUrl = vi.mocked(fetch).mock.calls
+        .map(([url]) => String(url))
+        .filter((url) => url.startsWith("/api/webui/sidebar-state/update?"))
+        .at(-1);
+      const lastEncoded = new URLSearchParams(lastUpdateUrl?.split("?", 2)[1]).get("state");
+      expect(JSON.parse(lastEncoded ?? "{}").view.sort).toBe("title_asc");
+    });
+  });
+
+  it("sorts chats by displayed title when A-Z is persisted", async () => {
+    mockSessions = [
+      {
+        key: "websocket:zulu",
+        channel: "websocket",
+        chatId: "zulu",
+        createdAt: "2026-04-16T12:00:00Z",
+        updatedAt: "2026-04-16T12:00:00Z",
+        title: "Zulu work",
+        preview: "later",
+      },
+      {
+        key: "websocket:new",
+        channel: "websocket",
+        chatId: "new",
+        createdAt: "2026-04-15T12:00:00Z",
+        updatedAt: "2026-04-15T12:00:00Z",
+        preview: "hi nanobot",
+      },
+      {
+        key: "websocket:alpha",
+        channel: "websocket",
+        chatId: "alpha",
+        createdAt: "2026-04-14T12:00:00Z",
+        updatedAt: "2026-04-14T12:00:00Z",
+        title: "Alpha plan",
+        preview: "earlier",
+      },
+    ];
+    const initialState = {
+      schema_version: 1,
+      pinned_keys: [],
+      archived_keys: [],
+      title_overrides: {},
+      tags_by_key: {},
+      collapsed_groups: {},
+      view: {
+        density: "comfortable",
+        show_previews: false,
+        show_timestamps: false,
+        show_archived: false,
+        sort: "title_asc",
+      },
+      updated_at: null,
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async (url: string | URL | Request) => {
+        const href = String(url);
+        if (href === "/api/webui/sidebar-state") {
+          return { ok: true, json: async () => initialState };
+        }
+        return { ok: false, status: 404 };
+      }),
+    );
+
+    render(<App />);
+
+    await waitFor(() => expect(connectSpy).toHaveBeenCalled());
+    const sidebar = screen.getByRole("navigation", { name: "Sidebar navigation" });
+    await waitFor(() =>
+      expect(within(sidebar).getByText("Chats")).toBeInTheDocument(),
+    );
+    const group = within(sidebar).getByText("Chats").closest("section");
+    expect(group).toBeTruthy();
+    const labels = within(group as HTMLElement)
+      .getAllByRole("button")
+      .map((button) => button.textContent?.trim())
+      .filter(Boolean);
+
+    expect(labels).toEqual(["Alpha plan", "New chat", "Zulu work"]);
+  });
+
   it("opens the settings view from the sidebar footer", async () => {
     mockSessions = [
       {

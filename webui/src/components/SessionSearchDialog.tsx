@@ -17,6 +17,7 @@ interface SessionSearchDialogProps {
   sessions: ChatSummary[];
   activeKey: string | null;
   loading: boolean;
+  titleOverrides?: Record<string, string>;
   onOpenChange: (open: boolean) => void;
   onSelect: (key: string) => void;
 }
@@ -26,6 +27,7 @@ export function SessionSearchDialog({
   sessions,
   activeKey,
   loading,
+  titleOverrides = {},
   onOpenChange,
   onSelect,
 }: SessionSearchDialogProps) {
@@ -38,8 +40,10 @@ export function SessionSearchDialog({
   const results = useMemo(() => {
     if (!normalizedQuery) return sessions;
     const terms = normalizedQuery.split(/\s+/).filter(Boolean);
-    return sessions.filter((session) => sessionMatchesTerms(session, terms));
-  }, [normalizedQuery, sessions]);
+    return sessions.filter((session) =>
+      sessionMatchesTerms(session, terms, titleOverrides[session.key]),
+    );
+  }, [normalizedQuery, sessions, titleOverrides]);
 
   useEffect(() => {
     if (!open) return;
@@ -139,7 +143,8 @@ export function SessionSearchDialog({
           ) : (
             <ul className="space-y-1">
               {results.map((session, index) => {
-                const title = session.title?.trim() ||
+                const title = titleOverrides[session.key]?.trim() ||
+                  session.title?.trim() ||
                   deriveTitle(session.preview, t("chat.newChat"));
                 const preview = session.preview.trim();
                 const showPreview =
@@ -190,8 +195,13 @@ export function SessionSearchDialog({
   );
 }
 
-function sessionMatchesTerms(session: ChatSummary, terms: string[]) {
+function sessionMatchesTerms(
+  session: ChatSummary,
+  terms: string[],
+  titleOverride?: string,
+) {
   const haystack = [
+    titleOverride,
     session.title,
     session.preview,
   ]
