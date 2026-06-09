@@ -6,6 +6,8 @@
 .env
 .web
 .orion
+nanobot-desktop/
+desktop/
 
 # Claude / AI assistant artifacts
 docs/superpowers/
@@ -97,3 +99,9 @@ logs/
 tmp/
 temp/
 *.tmp
+
+workspace/
+.claude/
+exp/
+graphify-out/
+.playwright-mcp/

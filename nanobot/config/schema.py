@@ -41,6 +41,15 @@ class ChannelsConfig(Base):
     transcription_language: str | None = Field(default=None, pattern=r"^[a-z]{2,3}$")  # Optional ISO-639-1 hint for audio transcription
 
 
+class ComputerUseToolConfig(Base):
+    """Computer Use tool configuration (macOS only)."""
+    enabled: bool = False
+    vision_provider: str = ""
+    vision_model: str = ""
+    vision_base_url: str = ""
+    vision_api_key: str = ""
+
+
 class DreamConfig(Base):
     """Dream memory consolidation configuration."""
 
