@@ -2,6 +2,7 @@ import os
 
 import pytest
 
+from nanobot.agent.tools.base import ToolResult
 from nanobot.agent.tools.context import RequestContext, request_context
 from nanobot.agent.tools.message import MessageTool
 from nanobot.bus.events import OutboundMessage
@@ -54,7 +55,10 @@ async def test_message_tool_suppresses_delivery_when_active() -> None:
     finally:
         tool.reset_suppress_delivery(token)
     assert sent == []
-    assert "not delivered" in result
+    assert isinstance(result, ToolResult)
+    assert result.is_error is True
+    assert result.error_code == "delivery_suppressed"
+    assert "Nothing was sent" in result
 
     await tool.execute(content="real", channel="telegram", chat_id="1")
     assert len(sent) == 1

@@ -465,3 +465,26 @@ def test_unregister_invalidates_cache() -> None:
     second = registry.get_definitions()
     assert first is not second
     assert len(second) == 1
+
+
+def test_without_returns_ordered_copy_excluding_named_tools() -> None:
+    registry = _registry_with_names(["read_file", "message", "write_file"])
+
+    restricted = registry.without(frozenset({"message"}))
+
+    assert restricted.tool_names == ["read_file", "write_file"]
+    assert "message" not in restricted
+    # The source registry is left untouched.
+    assert "message" in registry
+    assert registry.tool_names == ["read_file", "message", "write_file"]
+
+
+def test_without_shares_tool_instances_and_ignores_unknown_names() -> None:
+    registry = ToolRegistry()
+    tool = _FakeTool("message")
+    registry.register(tool)
+
+    stripped = registry.without(frozenset({"message", "missing"}))
+
+    assert stripped.tool_names == []
+    assert registry.without(frozenset()).get("message") is tool

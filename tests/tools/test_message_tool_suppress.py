@@ -6,6 +6,7 @@ import pytest
 
 from nanobot.agent.context import TranscriptInput
 from nanobot.agent.loop import AgentLoop
+from nanobot.agent.tools.base import ToolResult
 from nanobot.agent.tools.message import MessageTool
 from nanobot.bus.events import InboundMessage, OutboundMessage
 from nanobot.bus.queue import MessageBus
@@ -118,6 +119,50 @@ class TestMessageToolSuppressLogic:
 
         assert result is not None
         assert result.content == "Heartbeat summary"
+
+    @pytest.mark.asyncio
+    async def test_suppressed_send_returns_structured_error(self, tmp_path: Path) -> None:
+        tool = MessageTool(workspace=tmp_path)
+        send = AsyncMock()
+        tool.set_send_callback(send)
+        token = tool.set_suppress_delivery(True)
+        try:
+            result = await tool.execute(
+                content="report", channel="feishu", chat_id="chat123",
+            )
+        finally:
+            tool.reset_suppress_delivery(token)
+
+        assert isinstance(result, ToolResult)
+        assert result.is_error is True
+        assert result.error_code == "delivery_suppressed"
+        assert "Nothing was sent" in result
+        send.assert_not_awaited()
+
+    def test_heartbeat_toolset_excludes_message(self, tmp_path: Path) -> None:
+        loop = _make_loop(tmp_path)
+
+        restricted = loop.tools.without(frozenset({"message"}))
+
+        assert "message" in loop.tools
+        assert "message" not in restricted
+        assert len(loop.tools.tool_names) - len(restricted.tool_names) == 1
+
+    @pytest.mark.asyncio
+    async def test_restricted_toolset_rejects_message_call(self, tmp_path: Path) -> None:
+        loop = _make_loop(tmp_path)
+        mt = loop.tools.get("message")
+        assert isinstance(mt, MessageTool)
+        send = AsyncMock()
+        mt.set_send_callback(send)
+
+        restricted = loop.tools.without(frozenset({"message"}))
+        result = await restricted.execute(
+            "message", {"content": "x", "channel": "feishu", "chat_id": "chat123"},
+        )
+
+        assert "not found" in result
+        send.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_injected_followup_with_message_tool_does_not_emit_empty_fallback(

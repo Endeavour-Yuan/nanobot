@@ -241,7 +241,11 @@ class MessageTool(Tool):
 
         if self._suppress_delivery_var.get():
             logger.debug("MessageTool: delivery suppressed during internal check")
-            return f"Message acknowledged for {channel}:{chat_id} (not delivered)"
+            return ToolResult.error(
+                "Nothing was sent: message delivery is disabled during this internal "
+                "turn; output is gated by the post-run evaluator. Retrying will not help.",
+                error_code="delivery_suppressed",
+            )
 
         try:
             await self._send_callback(msg)

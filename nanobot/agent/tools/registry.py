@@ -212,6 +212,20 @@ class ToolRegistry:
         except Exception as e:
             return ToolResult.error(with_tool_error_hint(f"Error executing {name}: {str(e)}"))
 
+    def without(self, names: frozenset[str]) -> "ToolRegistry":
+        """Return a copy with the named tools omitted, preserving insertion order.
+
+        Used to scope the tools exposed for a single turn (for example, hiding
+        ``message`` during heartbeat internal checks) without mutating the
+        shared registry.
+        """
+        restricted = ToolRegistry()
+        for name in self.tool_names:
+            tool = self.get(name)
+            if tool is not None and name not in names:
+                restricted.register(tool)
+        return restricted
+
     @property
     def tool_names(self) -> list[str]:
         """Get list of registered tool names."""

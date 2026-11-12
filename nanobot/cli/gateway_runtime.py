@@ -731,18 +731,24 @@ def _run_claimed_gateway(
             )
 
             # Internal check: funnel all output through the post-run gate so the
-            # turn can't deliver directly via the message tool and skip it.
+            # turn can't deliver directly via the message tool and skip it. The
+            # `message` tool is withheld from this turn's toolset so the model
+            # cannot attempt a direct send; delivery suppression is kept as a
+            # safety net for any other path that might try to send.
             suppress_token = None
             if isinstance(message_tool, MessageTool):
                 suppress_token = message_tool.set_suppress_delivery(True)
             try:
                 await mcp_provider.connect()
+                # Snapshot after MCP connect so discovered MCP tools are included.
+                heartbeat_tools = agent.tools.without(frozenset({"message"}))
                 resp = await agent.process_direct(
                     prompt,
                     session_key=HEARTBEAT_SESSION_KEY,
                     channel=channel,
                     chat_id=chat_id,
                     on_progress=_silent,
+                    tools=heartbeat_tools,
                 )
             finally:
                 if isinstance(message_tool, MessageTool) and suppress_token is not None:
